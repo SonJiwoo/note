@@ -168,3 +168,147 @@ grid.arrange(condmu, meanmu, ncol = 1)
 
 # -----------------------------------------------------------------
 # Demo 3.4 Visualise Posterior Predictive Distirubtion
+# Visualise sampling from the posterior predictive distribution.
+# Calculate each predictive pdf with given mu and sigma.
+ynewdists <- sapply(xynew, function(x) dnorm(x, mu, sigma))
+
+# data frame of dirst draw from sample the predictive along with the exact value for plotting
+dfp <- data.frame(xynew, draw = ynewdists[1,], exact = p_new)
+# data frame for plotting the samples
+dfy <- data.frame(ynew, p = 0.02*max(ynewdists))
+# legend labels
+pred1labs <- c('Sample from the predictive distribution', 'Predictive distribution given the posterior sample')
+pred2labs <- c('Samples from the predictive distribution', 'Exact predictive distribution')
+joint3labs <- c('Samples', 'Exact contour')
+joint3 <- ggplot() +
+  geom_point(data = data.frame(mu, sigma), aes(mu, sigma, col = '1'), size = 0.1) +
+  geom_contour(data = dfj, aes(t1, t2, z = z, col = '2'), breaks = cl) +
+  geom_point(data = data.frame(x = mu[1], y = sigma[1]), aes(x, y), color = 'red') +
+  coord_cartesian(xlim = t1l,ylim = t2l) +
+  labs(title = 'Joint posterior', x = 'mu', y = 'sigma') +
+  scale_color_manual(values=c('blue', 'black'), labels = joint3labs) +
+  guides(color = guide_legend(nrow  = 1, override.aes = list(
+    shape = c(16, NA), linetype = c(0, 1), size = c(2, 1)))) +
+  theme(legend.background = element_blank(),
+        legend.position=c(0.5 ,0.9),
+        legend.title = element_blank())
+
+# Create a plot of the predicitive distribution and the respective sample.
+pred1 <- ggplot() +
+  geom_line(data = dfp, aes(xynew, draw, color = '2')) +
+  geom_point(data = dfy, aes(ynew[1], p, color = '1')) +
+  coord_cartesian(xlim = nl, ylim = c(0,0.04)) +
+  labs(title = 'Posterior predictive distribution', x = 'ytilde', y = '') +
+  scale_y_continuous(breaks = NULL) +
+  scale_color_manual(values = c('red', 'blue'), labels = pred1labs) +
+  guides(color = guide_legend(nrow = 2, override.aes = list(
+    linetype = c(0, 1), shape=c(16, NA), labels = pred1labs))) +
+  theme(legend.background = element_blank(),
+        legend.position = c(0.5 ,0.9),
+        legend.title = element_blank())
+# Create a plot for all ynews.
+pred2 <- ggplot() +
+  geom_line(data = dfp, aes(xynew, draw, color = '2')) +
+  geom_point(data = dfy, aes(ynew, p, color = '1'), alpha = 0.05) +
+  coord_cartesian(xlim = nl, ylim = c(0,0.04)) +
+  labs(x = 'ytilde', y = '') +
+  scale_y_continuous(breaks=NULL) +
+  scale_color_manual(values=c('darkgreen','blue'),labels=pred2labs) +
+  guides(color = guide_legend(nrow = 2, override.aes=list(
+    linetype = c(0, 1), shape = c(16, NA), alpha = c(1, 1) ,labels = pred2labs))) +
+  theme(legend.background = element_blank(),
+        legend.position = c(0.5 ,0.9),
+        legend.title = element_blank())
+
+# Combine the plots
+grid.arrange(joint3, pred1, grid.rect(gp = gpar(col = 'white')), pred2, nrow = 2)
+
+# -----------------------------------------------------------------
+# Demo 3.6 Binomial regression and grid samping for Bioassay data
+
+# data
+df1 <- data.frame(
+  x = c(-0.86, -0.30, -0.05, 0.73),
+  n = c(5, 5, 5, 5),
+  y = c(0, 1, 3, 5)
+)
+# EDA
+ggplot(df1, aes(x=x, y=y)) +
+  geom_point(size=2, color='red') +
+  scale_x_continuous(breaks = df1$x, minor_breaks=NULL, limits = c(-1.5, 1.5)) +
+  scale_y_continuous(breaks = 0:5, minor_breaks=NULL) +
+  labs(title = 'Bioassay', x = 'Dose (log g/ml)', y = 'Number of deaths') +
+  theme(panel.grid.major = element_blank())
+
+A = seq(-4, 8, length.out = 50)
+B = seq(-10, 40, length.out = 50)
+cA <- rep(A, each = length(B))
+cB <- rep(B, length(A))
+
+logl <- function(df, a, b){
+  df['y']*(a + b*df['x']) - df['n']*log1p(exp(a + b*df['x']))
+}
+
+p <- apply(df1, 1, logl, cA, cB) %>%
+  # sum the log likelihoods of observations
+  # and exponentiate to get the joint likelihood
+  rowSums() %>% exp()
+
+# sample from the grid(with replacement)
+nsamp <- 1000
+samp_indices <- sample(length(p), size = nsamp,
+                       replace = T, prob = p/sum(p))
+samp_A <- cA[samp_indices[1:nsamp]]
+samp_B <- cB[samp_indices[1:nsamp]]
+
+# add random jitter
+samp_A <- samp_A + runif(nsamp, (A[1] - A[2])/2, (A[2] - A[1])/2)
+samp_B <- samp_B + runif(nsamp, (B[1] - B[2])/2, (B[2] - B[1])/2)
+
+# create a dataframe
+samps <- tibble(ind = 1:nsamp, alpha = samp_A, beta = samp_B) %>%
+  mutate(ld50 = - alpha/beta)
+
+# plot draws of logistic curves
+invlogit <- plogis
+xr <- seq(-1.5, 1.5, length.out = 100)
+dff <- pmap_df(samps[1:100,], ~ data_frame(x = xr, id=..1,
+                                           f = invlogit(..2 + ..3*x)))
+ppost <- ggplot(df1, aes(x=x, y=y/n)) +
+  geom_line(data=dff, aes(x=x, y=f, group=id), linetype=1, color='blue', alpha=0.2) +
+  geom_point(size=2, color='red') +
+  scale_x_continuous(breaks = df1$x, minor_breaks=NULL, limits = c(-1.5, 1.5)) +
+  scale_y_continuous(breaks = seq(0,1,length.out=3), minor_breaks=NULL) +
+  labs(title = 'Bioassay', x = 'Dose (log g/ml)', y = 'Proportion of deaths') +
+  theme(panel.grid.major = element_blank())
+# add 50% deaths line and LD50 dots
+ppost + geom_hline(yintercept = 0.5, linetype = 'dashed', color = 'gray') +
+  geom_point(data=samps[1:100,], aes(x=ld50, y=0.5), color='blue', alpha=0.2)
+
+# Create a plot of the posterior density
+xl <- c(-2, 8) # limits for the plots
+yl <- c(-2, 40) # limits for the plots
+pos <- ggplot(data = data.frame(cA ,cB, p), aes(cA, cB)) +
+  geom_raster(aes(fill = p, alpha = p), interpolate = T) +
+  geom_contour(aes(z = p), colour = 'black', size = 0.2) +
+  coord_cartesian(xlim = xl, ylim = yl) +
+  labs(title = 'Posterior density evaluated in grid', x = 'alpha', y = 'beta') +
+  scale_fill_gradient(low = 'yellow', high = 'red', guide = F) +
+  scale_alpha(range = c(0, 1), guide = F)
+
+# plot of the samples
+sam <- ggplot(data = samps) +
+  geom_point(aes(alpha, beta), color = 'blue') +
+  coord_cartesian(xlim = xl, ylim = yl) +
+  labs(title = 'Posterior draws', x = 'alpha', y = 'beta')
+
+# combine the plots
+grid.arrange(pos, sam, nrow=2)
+
+# plot of the histogram of LD50
+his <- ggplot(data = samps) +
+  geom_histogram(aes(ld50), binwidth = 0.02,
+                 fill = 'steelblue', color = 'black') +
+  coord_cartesian(xlim = c(-0.5, 0.5)) +
+  labs(x = 'LD50 = -alpha/beta')
+his

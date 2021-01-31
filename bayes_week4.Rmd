@@ -1,0 +1,558 @@
+---
+title: "Week 4 - Hierarchical Model"
+subtitle: "베이즈 스터디"
+author: 강경훈
+institute: Yonsei ESC
+titlegraphic: logo.jpg
+date: "2021년 1월 30일"
+output: 
+  beamer_presentation:
+    latex_engine: xelatex
+    theme: "CambridgeUS"
+    colortheme: "wolverine"
+    fonttheme: "structurebold"
+    toc: true
+    includes:
+      in_header: NoSectionNumber.tex
+mainfont: "NanumBarunGothic"
+fontsize: 10pt
+classoption: "aspectratio=169"
+---
+
+## Package set up
+
+필요한 패키지들...
+```{r pkgs, results='hide', warning=F, message=F}
+pkgs = c('ggplot2', 'tidyverse', 'ggpubr', 'latex2exp')
+pkgs_ins = rownames(installed.packages())
+for(pkg in pkgs) if(!(pkg %in% pkgs_ins)) install.packages(pkg, character.only=T)
+sapply(pkgs, library, character.only=T)
+theme_set(theme_bw())
+theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+# Exchangeability and de Finetti
+
+## 데이터 구조가 복잡하다면
+
+내가 궁금한 것은 $\theta$ s.t. $y\mid \theta \sim Binom(n, \theta)$
+\begin{figure}
+\centerline{\includegraphics[width=0.8\textwidth]{figs/fig01.jpg}}
+\caption{BDA p.102}
+\end{figure}
+
+## 데이터 구조가 복잡하다면
+
+이렇게 생각해도 돼? 된다! **Exchangebility**와 **de Finetti 정리**에 대해 알아보자.
+\begin{figure}
+\centerline{\includegraphics[width=0.4\textwidth]{figs/fig02.jpg}}
+\caption{BDA p.103}
+\end{figure}
+
+# Bayesian Treatment of the Hierarchical Model
+
+## Bayesian Treatment of the Hierarchical Model
+
+Bayesian inference can be characterized as prescribing a full joint distribution of data and parameter combined as
+
+$$
+p(\theta, \mathcal{D}) = p(\theta)p(\mathcal{D} \mid \theta)
+$$
+and using sum rule and product rule to derive a specific conditional density in interest called the posterior density.
+
+$$
+\text{Posterior}\quad p(\theta \mid \mathcal{D}) = \dfrac{p(\theta, \mathcal{D})}{\int p(\theta, \mathcal{D})\, d\theta}
+$$
+
+since $\int p(\theta, \mathcal{D})\, d\theta$ in the denominator is a mere constant given $\mathcal{D}$, we could say the joint distribution is an "unnormalized" posterior.
+
+## Bayesian Treatment of the Hierarchical Model
+
+In this sense, in Bayesian inference, the parameter $\theta$ is treated as a random variable with probability density which represents our belief in the data generating process, each for before and after the data, translated in probabilistic sense. We might as well assume that this density belong to a parametric family of density determined by another parameter, or in fancier term "hyperparameter" $\phi$. If so, density can be written as $p(\theta \mid \phi)$ and we can imbue another prior density to the hyperparameter $\phi \sim p(\phi)$. In theory this chain of beliefs can ensue incessantly, but usually are limited to an extent deemed appropriate by our modeling assumptions.
+
+The full probability distrubion including the hyerparameter is
+
+$$
+p(\phi, \theta, \mathcal{D})= p(\phi)p(\theta \mid \phi) p(\mathcal{D}\mid \theta, \phi)
+$$
+
+but since in most cases, $\phi$ affects $\mathcal{D}$ not directly but only though $\theta$, so we have $p(\mathcal{D}\mid \theta, \phi) = p(\mathcal{D}\mid \theta)$.
+
+## Bayesian Treatment of the Hierarchical Model
+
+The model is no different from a standard Bayesian model taken up a notch to add another layer, and the inference procedure for the parameters $\theta, \phi$ does not change essentially. With the same sum rule and product rule, we have
+
+\begin{align}
+\text{Joint posterior} \quad p(\phi, \theta\mid \mathcal{D}) &\propto
+p(\phi)p(\theta \mid \phi) p(\mathcal{D}\mid \theta, \phi)\\
+\text{Conditional posterior} \quad p(\theta\mid \phi,\mathcal{D}) &\propto
+p(\theta \mid \phi) p(\mathcal{D}\mid \theta, \phi)\\
+\text{Marginal posterior} \quad p(\phi \mid\mathcal{D}) &\propto
+\int p(\phi, \theta\mid \mathcal{D})\,d\theta \\
+&= p(\phi)\int p(\theta \mid \phi) p(\mathcal{D}\mid \theta, \phi) \, d\theta
+\end{align}
+
+Or we can avoid integration in the marginal posterior for $\phi$ by using that $p(\phi\mid \mathcal{D})=\dfrac{p(\phi, \theta \mid \mathcal{D})}{p(\theta \mid \phi, \mathcal{D})}$.
+
+## Bayesian Treatment of the Hierarchical Model
+
+In practical examples, derivation of $p(\theta \mid \phi, \mathcal{D})$ is not much of a problem as the posterior density of $\theta$ given a specific value of hyperparameter is equivalent to deriving posterior for Bayesian model without $\phi$ (or, one could say we have a deterministic hyperparameter). Tricky parts in Hierarchical model are
+
+1. Setting up prior for $\phi$ as it could mostly affect the posterior results quite substantially. Ill-chosen prior might lead to an improper posterior, that is unbounded or does not sum to 1.
+
+2. Derivation of marginal posterior $p(\phi \mid \mathcal{D})$, which may or may not have closed analytic form. We may identify the posterior upto a multiplicative constant and generate samples to get empirical approximation.
+
+In following examples and problems, we would illustrate some important points of Hierarchical model using codes and figures.
+
+## Bayesian Treatment of the Hierarchical Model
+
+**Full conjugate sampling** (Binomial example)
+
+$\theta$의 샘플링 방법은
+
+1. $\phi \sim p(\phi \mid \mathcal{D})$ 
+2. $\theta \sim p(\theta \mid \phi, \mathcal{D})$ 
+
+**Semi-conjugate sampling** (Normal example)
+
+혹은 이렇게까지 안 하고, 그냥 full conditional posteriors를 구해서 깁스 샘플링 해도 된다.
+\begin{align}
+\theta &\sim \pi(\theta \mid \phi, y)\\
+\phi &\sim \pi(\phi \mid \theta, y)
+\end{align}
+
+
+# Example 1: Binomial Likelihood (Rats tumor)
+
+## Probability model
+
+Let $y_i \sim Binom(n_i, \theta_i)$ and $\theta_j\mid \alpha,\beta\sim Beta(\alpha, \beta)$. 
+\begin{align}
+p(\alpha, \beta, \theta, \mathcal{D}) &=
+\pi(\alpha, \beta) \pi(\theta \mid \alpha, \beta) f(\mathcal{D} \mid \theta, \alpha, \beta)\\ &=
+\pi(\alpha, \beta)\prod_j Beta(\theta_j ; \alpha, \beta) \prod_jBinom(y_j ; n_j, \theta_j)\\
+p(\alpha, \beta, \theta \mid \mathcal{D}) &\propto
+\pi(\alpha, \beta)\prod_j Beta(\theta_j ; \alpha, \beta) \prod_jBinom(y_j ; n_j, \theta_j)\\
+\quad p(\theta \mid \alpha, \beta, \mathcal{D}) &=
+\prod_j Beta(\theta_j ; \alpha+y_j, \beta+n_j-y_j) \quad \text{(A)}\\
+\quad p(\alpha, \beta\mid  \mathcal{D}) &\propto
+\pi(\alpha, \beta) \Bigg( \dfrac{\Gamma(\alpha+\beta)}{\Gamma(\alpha)\Gamma(\beta)}\Bigg)^J
+\prod_j \Bigg( \dfrac{\Gamma(\alpha+y_j)\Gamma(\beta+n_j-y_j)}{\Gamma(\alpha+\beta+n_j)}  \Bigg)
+\quad \text{(B)}
+\end{align}
+where (A) is derived because $\theta \mid \mathcal{D}$ given a specific value of $\alpha, \beta$ is the same as that of the usual Beta-binomial conjugate model, and (B) is obtained from $p(\alpha,\beta \mid \mathcal{D}) = \frac{p(\theta,\alpha, \beta \mid \mathcal{D})}{p(\theta \mid \alpha, \beta, \mathcal{D})}$.
+
+## Prior setup
+
+As for a prior $p(\alpha, \beta)$, we would use
+
+\begin{align}
+p(\frac{\alpha}{\alpha+\beta}, \frac{1}{\sqrt{\alpha+\beta}})&\propto 1
+\end{align}
+
+which is equivalent to 
+
+
+\begin{align}
+p(\alpha, \beta) &\propto (\alpha+\beta)^{-5/2}
+\end{align}
+
+which we would prove later.
+
+## Marginal density
+
+The marginal posterior would be ($\log \Gamma() = g()$)
+
+\begin{align}\
+p(\alpha, \beta \mid \mathcal{D}) &=
+(\alpha+\beta)^{-5/2}
+\Bigg( \dfrac{\Gamma(\alpha+\beta)}{\Gamma(\alpha)\Gamma(\beta)}\Bigg)^J
+\prod_j \Bigg( \dfrac{\Gamma(\alpha+y_j)\Gamma(\beta+n_j-y_j)}{\Gamma(\alpha+\beta+n_j)}  \Bigg)
+\\
+\log p(\alpha,\beta\mid \mathcal{D})&=
+-5/2 \log (\alpha+\beta) 
++ J\big(g(\alpha+\beta) -g(\alpha) - g(\beta)\big)\\&
++\sum_j 
+\Big[ 
+g(\alpha+y_j) +g(\beta+n_j-y_j) - g(\alpha+\beta+n_j)
+\Big]
+\end{align}
+
+## Separate prior for each theta
+
+```{r, include=F, eval=F}
+y <- c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,
+        2,1,5,2,5,3,2,7,7,3,3,2,9,10,4,4,4,4,4,4,4,10,4,4,4,5,11,12,
+        5,5,6,5,6,6,6,6,16,15,15,9,4)
+n <- c(20,20,20,20,20,20,20,19,19,19,19,18,18,17,20,20,20,20,19,19,18,18,25,24,
+       23,20,20,20,20,20,20,10,49,19,46,27,17,49,47,20,20,13,48,50,20,20,20,20,
+       20,20,20,48,19,19,19,22,46,49,20,20,23,19,22,20,20,20,52,46,47,24,14)
+DF = data.frame(y=y, n=n)
+write.table(DF, "data/rats.csv", row.names = F, sep=",")
+```
+
+$\Gamma(1,1)$ prior for each $\theta_j$
+
+```{r}
+DF = read.csv("data/rats.csv")
+DF$ybar = DF$y / DF$n
+DF$postmean = (DF$y + 1) / (DF$n + 1)
+DF$lb = mapply(function(y, n) qbeta(0.025, y + 1, n - y + 1), DF$y, DF$n)
+DF$ub = mapply(function(y, n) qbeta(1 - 0.025, y + 1, n - y + 1), DF$y, DF$n)
+
+title1 = expression(paste("95% Posterior interval, ", Gamma(1, 1), " prior"))
+p1 = ggplot(DF, aes(x = ybar, ymin = lb, ymax = ub)) +
+  geom_linerange() + geom_point(aes(y = postmean)) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = title1, x = "observed mean", y = "posterior mean")
+```
+
+## Separate prior for each theta
+
+```{r, out.height="70%", echo=FALSE}
+p1
+```
+
+
+## Hierarchical model
+
+Grid approximation to marginal posterior $p(a,b \mid y)$
+
+\scriptsize
+```{r}
+griddens = 1e2
+A = seq(0.5, 6, length.out = griddens)
+B = seq(3, 33, length.out = griddens)
+cA = rep(A, each = length(B))
+cB = rep(B, length(A))
+
+lpfun = function(a, b, y, n) # marginal posterior
+  (-5/2)* log(a+b) + sum(lgamma(a+b) - lgamma(a) - lgamma(b) + lgamma(a+y) + lgamma(b+n-y) - lgamma(a+b+n))
+lp = mapply(lpfun, cA, cB, MoreArgs = list(DF$y, DF$n))
+df_marg = data.frame(alpha= cA, beta= cB, posterior = exp(lp)/sum(exp(lp)))
+
+title2 = TeX('The marginal of $\\alpha$ and $\\beta$')
+p2 = ggplot(data = df_marg, aes(x=alpha, y=beta))+
+  geom_raster(aes(fill = posterior, alpha= posterior), interpolate= T)+
+  geom_contour(aes(z= posterior), color = 'black', size= 0.2)+
+  coord_cartesian(xlim= c(1,5), ylim= c(4,26))+
+  labs(x = TeX('$\\alpha$'), y= TeX('$\\beta$'), title= title1)+
+  scale_fill_gradient(low= "cornflowerblue", high= "navy", guide= F)+
+  scale_alpha(range= c(0,1), guide=F)
+```
+\normalsize
+
+## Hierarchical model
+
+Grid approximation to marginal posterior $p(a,b \mid y)$
+
+\tiny
+```{r, out.height="70%", echo=FALSE}
+p2
+```
+\normalsize
+
+## Hierarchical model
+
+Grid approximated marginal means $E(\alpha\mid y), E(\beta \mid y)$
+
+```{r}
+sum(df_marg$alpha * df_marg$posterior)
+sum(df_marg$beta * df_marg$posterior)
+```
+
+
+## Hierarchical model
+
+Grid sampling to generate posterior samples of $\alpha, \beta$
+
+\scriptsize
+```{r, cache=T}
+Nsamp = 1e3
+set.seed(101)
+
+# sample alpha, beta
+samp_idx = sample(length(df_marg$posterior), 
+                  size = Nsamp, replace=T, prob = df_marg$posterior)
+samp_A = cA[samp_idx]
+samp_B = cB[samp_idx]
+
+# sample theta_j for each j
+DF = read.csv("data/rats.csv")
+DF$postmean = DF$ub = DF$lb = rep(NA, nrow(DF))
+for(i in 1:nrow(DF)){
+  n = DF$n[i]; y = DF$y[i]
+  theta_j = mapply(function(a, b, n, y) rbeta(1, y+a, n-y+b), 
+                   samp_A, samp_B, MoreArgs = list(n=n, y=y))
+  DF$lb[i] = quantile(theta_j, 0.025)
+  DF$ub[i] = quantile(theta_j, 1-0.025)
+  DF$postmean[i] = mean(theta_j)
+}
+```
+\normalsize
+
+## Hierarchical model
+
+Grid sampling to generate posterior samples of $\alpha, \beta$
+
+\tiny
+```{r, out.height="60%"}
+DF$ybar = DF$y / DF$n
+title3 = TeX('95% posterior interval, uninformative $\\alpha$, $\\beta$ prior')
+ggplot(DF, aes(x=ybar, ymin=lb, ymax=ub))+
+  geom_linerange()+geom_point(aes(y=postmean))+geom_abline(slope = 1, intercept = 0)+
+  labs(title=title3, x="observed mean", y="posterior mean")
+```
+\normalsize
+
+
+# Example 2: Normal Likelihood (Math scores)
+
+## Data
+
+\scriptsize
+```{r, cache=T}
+options(dplyr.summarise.inform = FALSE)
+
+DF = dget('http://www2.stat.duke.edu/~pdh10/FCBS/Inline/Y.school.mathscore') %>% 
+  as.data.frame
+
+meanscore = DF %>% 
+  group_by(school) %>% 
+  summarise(meanscore = mean(mathscore), count=n()) %>% 
+  mutate(rank=rank(meanscore))
+
+school.toplot = DF %>% 
+  left_join(meanscore, by='school') %>% 
+  mutate(minscore = min(mathscore), maxscore=max(mathscore))
+
+title4_1 = "Score distribution per school"
+p1 = ggplot(school.toplot, aes(x=rank, y=mathscore, group=school))+
+  stat_summary(fun.min =min, fun.max = max, fun=mean)+
+  geom_hline(yintercept = mean(DF$mathscore))+
+  labs(title=title4_1)
+
+title4_2 = "Mean vs sample size"
+p2 = ggplot(meanscore, aes(x=count, y=meanscore))+
+  geom_point(shape=21, fill = "lightgray", color = "black", size = 3)+
+  geom_hline(yintercept = mean(DF$mathscore))+
+  labs(title=title4_2)
+```
+\normalsize
+
+## Data
+
+표본 수가 작은 학교들일수록 평균의 차이가 크다
+
+```{r, out.height="70%", echo=FALSE}
+ggarrange(p1, p2)
+```
+
+
+## Gibbs Sampling, varying means
+
+Full probability model
+
+$$
+p(\theta, \mu, \tau^2, \sigma^2, y) = 
+p(\mu)p(\tau^2)p(\sigma^2)\prod_{j=1}^m p(\theta_j \mid \mu, \tau^2)\prod_{j=1}^m \prod_{i=1}^{n_j} p(y_{j,i}\mid \theta_j, \sigma^2)
+$$
+
+\begin{figure}
+\centerline{\includegraphics[width=0.4\textwidth]{figs/fig03.jpg}}
+\caption{FCB p.133}
+\end{figure}
+
+
+## Gibbs Sampling, varying means
+
+Full conditional posteriors
+\begin{align}
+p(\mu \mid \theta, \tau^2, \sigma^2, \mathcal{D}) 
+&\propto p(\mu)\prod_{j=1}^m p(\theta_j \mid \mu, \tau^2)\\
+p(\tau^2 \mid \theta_{j=1}^m, \mu, \sigma^2, \mathcal{D}) 
+&\propto p(\tau^2)\prod_{j=1}^m p(\theta_j \mid \mu, \tau^2)\\
+p(\theta_j \mid \mu, \tau^2, \sigma^2, \mathcal{D}) 
+&\propto p(\theta_j\mid\mu, \tau^2) \prod_{j=1}^m \prod_{i=1}^{n_j} p(y_{j,i}\mid \theta_j, \sigma^2)\\
+p(\sigma^2 \mid \theta, \mu, \tau^2, \mathcal{D}) 
+&\propto p(\sigma^2) \prod_{j=1}^m \prod_{i=1}^{n_j} p(y_{j,i}\mid \theta_j, \sigma^2)
+\end{align}
+
+## Gibbs Sampling, varying means
+
+Full conditional posteriors
+\begin{align}
+\{\mu \mid \theta_{j=1}^m, \tau^2\} &\sim N\left(\frac{m\bar{\theta} / \tau^2 + \mu_0 / \gamma_0^2}{m/\tau^2 + 1 / \gamma_0^2}, \left[m / \tau^2 + 1 / \gamma_0^2 \right]^{-1}\right) \\
+\{\tau^2 \mid \theta_{j=1}^m, \mu\} &\sim inv\Gamma\left(\frac{\eta_0 + m}{2}, \frac{\eta_0\tau_0^2 + \sum_{j = 1}^{m}(\theta_j - \mu)^2}{2} \right) \\
+\{\theta_j \mid \mathcal{D}, \sigma^2\} &\sim N\left(\frac{n_j\bar{y}_j / \sigma^2 + 1 / \tau^2}{n_j / \sigma^2 + 1 / \tau^2}, \left[ n_j / \sigma^2 + 1 / \tau^2 \right]^{-1} \right) \\
+\{\sigma^2 \mid \theta_{j=1}^m, \mathcal{D}\} &\sim inv\Gamma\left(\frac{1}{2}\left[ \nu_0 + \sum_{j = 1}^m n_j\right], \frac{1}{2}\left[\nu_0\sigma_0^2 + \sum_{j = 1}^{m} \left( \sum_{i = 1}^{n_j} (y_{i, j} - \theta)^2 \right) \right] \right)
+\end{align}
+
+## Gibbs Sampling, varying means
+
+Gibbs sampling for the joint posterior samples
+
+\tiny
+```{r, cache=T}
+# prior
+nu0 = 1; s20 = 100 # sigma2
+eta0 = 1; t20 = 100 # tau
+mu0 = 50; g20 = 25 # mu
+
+# data suff stats: counts, mean, sd
+options(dplyr.summarise.inform = FALSE)
+suffstat = DF %>% 
+  group_by(school) %>% 
+  summarise(ybar = mean(mathscore), sv = var(mathscore), n=n())
+m = length(suffstat$school)
+n = suffstat$n
+ybar = suffstat$ybar
+sv = suffstat$sv
+
+# initial points for Gibbs sampling
+theta = ybar
+sigma2 = mean(sv)
+mu = mean(theta)
+tau2 = var(theta)
+
+# setup
+set.seed(101)
+S = 5e3
+THETA = matrix(nrow=S, ncol=m)
+SMT = matrix(nrow=S, ncol=3)
+```
+\normalsize
+
+## Gibbs Sampling, varying means
+
+\tiny
+```{r, cache=T}
+tic = Sys.time()
+# MCMC
+for(s in 1:S){
+  # sample thetas
+  for(j in 1:m){
+    Vtheta = 1 / (n[j] / sigma2 + 1 / tau2)
+    Etheta = Vtheta * (mu / tau2 + ybar[j] * n[j] / sigma2)
+    theta[j] = rnorm(1, Etheta, sqrt(Vtheta))
+  }
+  # sample sigma2
+  nun = nu0 + sum(n)
+  ss = nu0*s20
+  for(j in 1:m){ ss = ss + sum((DF[DF[,1]==j, 2] - theta[j])^2) }
+  sigma2 = 1/rgamma(1, nun/2, ss/2)
+  # sample mu
+  Vmu = 1/(m/tau2 + 1/g20)
+  Emu = Vmu * (m*mean(theta) / tau2 + mu0/g20)
+  mu = rnorm(1, Emu, sqrt(Vmu))
+  # sample tau2
+  etam = eta0 + m
+  ss = eta0*t20 + sum((theta - mu)^2)
+  tau2 = 1/rgamma(1, etam/2, ss/2)
+  # store results
+  THETA[s, ] = theta; SMT[s, ] = c(sigma2, mu, tau2)
+}
+toc = Sys.time()
+toc - tic
+```
+\normalsize
+
+## Gibbs Sampling, varying means
+
+Results 
+```{r}
+title4 = TeX("Marginal posteriors for $\\mu$, $\\sigma^2$, and $\\tau^2$")
+p1 = data.frame(mu = SMT[,2], sigma2 = SMT[,1], tau2 = SMT[,3]) %>% 
+  gather(key="hyperparam", value="samples") %>% 
+  ggplot(aes(x=samples, color=hyperparam))+
+  geom_histogram(aes(y=..density..), bins=30)+
+  geom_density(alpha=.2, fill="#FF6666") +
+  facet_grid(~hyperparam, scales = "free")+ theme(legend.position = "none")+
+  labs(title=title4)
+```
+
+## Gibbs Sampling, varying means
+
+Results 
+```{r, out.height="70%", echo=FALSE}
+p1
+```
+
+
+## Gibbs Sampling, varying means
+
+Results
+
+\scriptsize
+```{r}
+suffstat$postmean = colMeans(THETA)
+suffstat$lb = apply(THETA, 2, function(x) quantile(x, 0.025))
+suffstat$ub = apply(THETA, 2, function(x) quantile(x, 1-0.025))
+
+title5 = TeX("95% posterior interval for $\\theta_j$")
+p1 = ggplot(suffstat, aes(x=ybar, ymin = lb, ymax = ub))+
+  geom_linerange() + geom_point(aes(y=postmean)) + geom_abline(slope=1, intercept = 0)+
+  labs(title=title5, x = 'sample mean', y = 'posterior mean')
+
+title6 = TeX("Sample size vs shrinkage $(\\bar{y} - \\hat{\\theta})$")
+p2 = data.frame(samplesize = suffstat$n, shrinkage = suffstat$ybar - suffstat$postmean) %>% 
+  ggplot(aes(x = samplesize, y = shrinkage))+
+  geom_point(shape = 21, fill= "lightgray", color="black", size=3)+
+  geom_hline(yintercept = 0)+
+  labs(title= title6, x = "sample size", y = TeX("$(\\bar{y} - \\hat{\\theta})$"))
+```
+\normalsize
+
+## Gibbs Sampling, varying means
+
+Results: Hyperparameter로 인해 shrinkage가 발생함을 볼 수 있다.
+
+```{r, out.height="70%", echo=FALSE}
+ggarrange(p1, p2)
+```
+
+## Gibbs Sampling, varying means and variances
+
+$\nu_0, \sigma_0^2$의 full conditional posterior는? 구할 수 있나?
+
+\begin{figure}
+\centerline{\includegraphics[width=0.4\textwidth]{figs/fig04.jpg}}
+\caption{FCB p.144}
+\end{figure}
+
+# Homework
+
+## Homework
+
+1. $p(\alpha,\beta) \propto (\alpha+\beta)^{-5/2}$ 보이기
+2. BDA Ch05 ~5.4, FCB Ch 08
+3. FCB 교재 Fig 8.11, 8.12 재현
+4. FCB Exercise 8.1, 8.3 (MCMC diagnostics 하지말고)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
