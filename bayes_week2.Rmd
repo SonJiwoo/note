@@ -5,7 +5,7 @@ date: '2021 1 13 '
 output:
   pdf_document: null
   latex_engine: xelatex
-mainfont: NanumGothic---
+mainfont: NanumGothic
 ---
 
 ```{r setup, include=FALSE}
