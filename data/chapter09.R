@@ -1,8 +1,6 @@
 #### Functions for variable selection
-source("regression_gprior.R")
+source("data/regression_gprior.R")
 source("backselect.R")
-
-
 
 #### Figure 9.1
 pdf("fig9_1.pdf",family="Times",height=3.5,width=7)
